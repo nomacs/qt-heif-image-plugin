@@ -4,9 +4,32 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# load paths from the user file if exists
+if (EXISTS ${CMAKE_SOURCE_DIR}/CMakeUserPaths.cmake)
+	include(${CMAKE_SOURCE_DIR}/CMakeUserPaths.cmake)
+	
+	 if(NOT QT_QMAKE_EXECUTABLE)
+		find_program(QT_QMAKE_EXECUTABLE NAMES "qmake" "qmake-qt5" "qmake.exe")
+	 endif()
+	 if(NOT QT_QMAKE_EXECUTABLE)
+		message(FATAL_ERROR "you have to set the path to the Qt5 qmake executable")
+	 endif()
+	 
+	 message(STATUS "QMake found: ${QT_QMAKE_EXECUTABLE}")
+	 get_filename_component(QT_QMAKE_PATH ${QT_QMAKE_EXECUTABLE} PATH)
+	 
+	set(QT_ROOT ${QT_QMAKE_PATH}/)
+	set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${QT_QMAKE_PATH}/../lib/cmake/Qt5)
+	
+	message(STATUS "using user paths, new prefix path: ${CMAKE_PREFIX_PATH}")
+elseif(MSVC)
+	message(WARNING "Could not find CMakeUserPaths.cmake - please use this file to specify your install directories (see CMakeUserPathsGit.cmake)")
+endif()
+
 # make release build, if not specified
 # (from https://blog.kitware.com/cmake-and-the-default-build-type/)
 set(default_build_type "RelWithDebInfo")
+set(CMAKE_DEBUG_POSTFIX "d")
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE STRING "Build type" FORCE)
@@ -17,19 +40,23 @@ endif ()
 
 # compiler flags
 # TODO: separate GCC and Clang warnings; add more
-set(
-  CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-  -Wall \
-  -Wextra \
-  -Wshadow \
-  -Wformat-nonliteral \
-  -Wformat-security \
-  -Wnon-virtual-dtor \
-  ")
+if (!MSVC)
+	set(
+		  CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+		  -Wall \
+		  -Wextra \
+		  -Wshadow \
+		  -Wformat-nonliteral \
+		  -Wformat-security \
+		  -Wnon-virtual-dtor \
+		  ")
+  
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+	set(sanitizer_flags "-fsanitize=address -fsanitize=undefined")
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Og")
+endif()
 
-set(sanitizer_flags "-fsanitize=address -fsanitize=undefined")
+
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${sanitizer_flags}")
 set(CMAKE_MODULE_LINKER_FLAGS_DEBUG
     "${CMAKE_MODULE_LINKER_FLAGS_DEBUG} ${sanitizer_flags}")
@@ -44,15 +71,25 @@ add_definitions(-DQT_NO_KEYWORDS)
 set(CMAKE_AUTOMOC ON)
 
 # libheif
-find_package(PkgConfig)
-pkg_check_modules(libheif REQUIRED libheif>=1.1)
+if (!MSVC)
+	find_package(PkgConfig)
+	pkg_check_modules(libheif REQUIRED libheif>=1.1)
+else()
+
+	find_package(libheif)
+	include_directories( ${libheif_INCLUDE_DIR})
+
+	if(!LIBHEIF_FOUND)
+		message(FATAL_ERROR "I could not find libheif which is needed. You should add its path to the CMAKE_PREFIX_PATHS")
+	endif()
+
+endif()
 
 #
 # project source
 #
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
 set(sources main.cpp qheifhandler.cpp)
 
 add_library(qheif MODULE ${sources})
@@ -61,7 +98,7 @@ target_link_libraries(
   qheif
   PRIVATE
   Qt5::Gui
-  ${libheif_LIBRARIES}
+	${libheif_LIBRARIES}
 )
 
 #
