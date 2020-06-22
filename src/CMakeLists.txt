@@ -22,8 +22,6 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/CMakeUserPaths.cmake)
 	set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${QT_QMAKE_PATH}/../lib/cmake/Qt5)
 	
 	message(STATUS "using user paths, new prefix path: ${CMAKE_PREFIX_PATH}")
-elseif(MSVC)
-	message(WARNING "Could not find CMakeUserPaths.cmake - please use this file to specify your install directories (see CMakeUserPathsGit.cmake)")
 endif()
 
 # make release build, if not specified
@@ -73,14 +71,18 @@ set(CMAKE_AUTOMOC ON)
 # libheif
 if (!MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(libheif REQUIRED libheif>=1.1)
+    pkg_check_modules(libheif REQUIRED libheif>=1.1)
 else()
 
 	find_package(libheif)
 	include_directories( ${libheif_INCLUDE_DIR})
 
+    message(STATUS "HEIF include directories: ${libheif_INCLUDE_DIR}")
+
 	if(!LIBHEIF_FOUND)
-		message(FATAL_ERROR "I could not find libheif which is needed. You should add its path to the CMAKE_PREFIX_PATHS")
+        message(FATAL_ERROR "I could not find libheif which is needed. You should add its path to the CMAKE_PREFIX_PATHS")
+    else()
+        message(STATUS "libheif found...")
 	endif()
 
 endif()
